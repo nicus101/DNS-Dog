@@ -11,8 +11,7 @@ import (
 
 type updateRecord struct {
 	SubDomain string `json:"subDomain"`
-	Target    string `json:"target"`
-	TTL       int    `json:"ttl"`
+	Target    string `json:"ip"`
 }
 
 func connectOVH() *ovh.Client {
@@ -27,7 +26,7 @@ func connectOVH() *ovh.Client {
 
 func getDomainID(client *ovh.Client, domain string) (int, error) {
 
-	endpoint := strings.Join([]string{"/domain/zone", getZone(domain), "record?fieldType=IPv4", "&subDomain=", GetSubDomain(domain)}, "")
+	endpoint := strings.Join([]string{"/domain/zone/", getZone(domain), "/dynHost/record?", "subDomain=", GetSubDomain(domain)}, "")
 	var domains []int
 	err := client.Get(endpoint, &domains)
 	if err != nil {
@@ -40,17 +39,17 @@ func updateSubDomainIP(client *ovh.Client, domain string, id int, IP net.IP) err
 
 	IPstr := IP.To4().String()
 
-	endpoint := strings.Join([]string{"/domain/zone/", getZone(domain), "/record/", strconv.Itoa(id)}, "")
+	endpoint := strings.Join([]string{"/domain/zone/", getZone(domain), "/dynHost/record/", strconv.Itoa(id)}, "")
 	record := updateRecord{
 		SubDomain: GetSubDomain(domain),
 		Target:    IPstr,
-		TTL:       60,
 	}
 
-	err := client.Put(endpoint, &record, nil)
+	var resp any
+	err := client.Put(endpoint, record, &resp)
 	if err != nil {
 		return err
 	}
-	fmt.Println("Description updated")
+	fmt.Println("Description updated", resp)
 	return nil
 }
