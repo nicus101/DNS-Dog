@@ -7,7 +7,7 @@ endpoint=ovh-eu
 client_id=my_client_id
 client_secret=my_client_secret
 
-;or uncomment this if you use App key, app secret, consumer key
+;or uncomment this if you use App key, app secret, consumer key visit https://eu.api.ovh.com/createToken/ to get keys
 ;application_key=my_app_key
 ;application_secret=my_application_secret
 ;consumer_key=my_consumer_key
