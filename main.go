@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net"
@@ -12,22 +13,32 @@ func main() {
 	domains := loadDomainList()
 	var lastIP net.IP
 
-	//if getCMDArguments() {
-	for {
-		scanAndRefresh(&lastIP, domains)
-		time.Sleep(1 * time.Minute)
-	}
-	//}
+	arguments := getCMDArguments()
 
-	//scanAndRefresh(&lastIP, domains)
+	if arguments.watchPtr {
+		fmt.Println("Running in watch mode with interval:", arguments.timePtr)
+		for {
+			err := scanAndRefresh(&lastIP, domains)
+			if err != nil {
+				log.Fatal("Fatal error:", err)
+			}
+			time.Sleep(arguments.timePtr)
+		}
+	}
+
+	err := scanAndRefresh(&lastIP, domains)
+	if err != nil {
+		log.Fatal("Fatal error:", err)
+	}
 }
 
 func scanAndRefresh(lastIp *net.IP, domains []string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
 
-	ipStr := GetIP()
-	ip := net.ParseIP(ipStr)
-	if ip == nil {
-		return fmt.Errorf("parsing ip %q failed", ipStr)
+	ip, err := GetIP(ctx)
+	if err != nil {
+		return fmt.Errorf("public ip: %w", err)
 	}
 
 	if ip.Equal(*lastIp) {

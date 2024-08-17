@@ -1,10 +1,17 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"time"
 
 	"golang.org/x/net/publicsuffix"
 )
+
+type CMDLineStruct struct {
+	watchPtr bool
+	timePtr  time.Duration
+}
 
 func getZone(domain string) string {
 	zone, err := publicsuffix.EffectiveTLDPlusOne(domain)
@@ -23,18 +30,15 @@ func GetSubDomain(domain string) string {
 	return domain[:len(domain)-len(zone)-1]
 }
 
-// func getCMDArguments() bool {
+func getCMDArguments() CMDLineStruct {
+	var pointers CMDLineStruct
 
-// 	var wFlag = flag.String("watch", "true", "must be true or false")
-// 	flag.Parse()
-// 	fmt.Print(flag.Arg(0))
-// 	if flag.Arg(0) == "watch" || flag.Arg(0) == "w" {
-// 		return true
-// 	}
-// 	if flag.Arg(0) == "" {
-// 		fmt.Println("Running once ^^")
-// 		return false
-// 	}
+	flag.BoolVar(&pointers.watchPtr, "watch", false, "used to start in watch mode that checks and acts when ip's changed")
+	flag.BoolVar(&pointers.watchPtr, "w", false, "used to start in watch mode that checks and acts when ip's changed")
+	flag.DurationVar(&pointers.timePtr, "time", 1*time.Minute, "set ip check interval, 2m means two minutes 2h means two hours")
+	flag.DurationVar(&pointers.timePtr, "t", 1*time.Minute, "set ip check interval, 2m means two minutes 2h means two hours")
 
-// 	panic("Wrong arguments only -w or --watch supported")
-// }
+	flag.Parse()
+
+	return pointers
+}
