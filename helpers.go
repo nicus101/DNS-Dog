@@ -3,6 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
+	"net"
 	"time"
 
 	"golang.org/x/net/publicsuffix"
@@ -28,6 +30,15 @@ func GetSubDomain(domain string) string {
 		return ""
 	}
 	return domain[:len(domain)-len(zone)-1]
+}
+
+func compareIP(obtainedIP net.IP, domainIP net.IP) bool {
+
+	if obtainedIP.Equal(domainIP) {
+		log.Println("ip not changed", obtainedIP)
+		return true
+	}
+	return false
 }
 
 func getCMDArguments() CMDLineStruct {

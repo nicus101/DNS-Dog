@@ -14,6 +14,11 @@ type updateRecord struct {
 	Target    string `json:"ip"`
 }
 
+type domainData struct {
+	Id int    `json:"id"`
+	Ip net.IP `json:"ip"`
+}
+
 func connectOVH() *ovh.Client {
 	client, err := ovh.NewEndpointClient("ovh-eu")
 	if err != nil {
@@ -24,15 +29,18 @@ func connectOVH() *ovh.Client {
 	return client
 }
 
-func getDomainID(client *ovh.Client, domain string) (int, error) {
+func getDomainID(client *ovh.Client, domain string) (*domainData, error) {
 
 	endpoint := strings.Join([]string{"/domain/zone/", getZone(domain), "/dynHost/record?", "subDomain=", GetSubDomain(domain)}, "")
-	var domains []int
-	err := client.Get(endpoint, &domains)
-	if err != nil {
-		return 0, err
+	domainInfo := &domainData{
+		Id: 0,
+		Ip: nil,
 	}
-	return domains[0], nil
+	err := client.Get(endpoint, &domainInfo)
+	if err != nil {
+		return domainInfo, err
+	}
+	return domainInfo, nil
 }
 
 func updateSubDomainIP(client *ovh.Client, domain string, id int, IP net.IP) error {

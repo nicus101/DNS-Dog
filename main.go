@@ -51,14 +51,20 @@ func scanAndRefresh(lastIp *net.IP, domains []string) error {
 	lastZone := ""
 
 	for _, domain := range domains {
-		id, _ := getDomainID(connection, domain)
-		updateSubDomainIP(connection, domain, id, ip)
-		lastZone = getZone(domain)
-	}
+		domainInfo, _ := getDomainID(connection, domain)
 
-	if lastZone != "" {
-		domainsRefresh(connection, lastZone)
+		if !compareIP(ip, domainInfo.Ip) {
+
+			updateSubDomainIP(connection, domain, domainInfo.Id, ip)
+			lastZone = getZone(domain)
+		}
+
+		if lastZone != "" {
+			domainsRefresh(connection, lastZone)
+		}
+		fmt.Println("domain and host ip's match, skipping")
 	}
 
 	return nil
+
 }
