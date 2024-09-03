@@ -1,0 +1,3 @@
+Ragnarok:
+  command: "sh /home/rAthena/rathena-start"
+  arguments: "restart"

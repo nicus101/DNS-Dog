@@ -11,6 +11,11 @@ import (
 func main() {
 
 	domains := loadDomainList()
+	execList, err := loadExecList("execute.yaml")
+	if err != nil {
+		log.Fatal("Can't load execute.yaml: ", err)
+	}
+
 	var lastIP net.IP
 
 	arguments := getCMDArguments()
@@ -18,7 +23,7 @@ func main() {
 	if arguments.watchPtr {
 		fmt.Println("Running in watch mode with interval:", arguments.timePtr)
 		for {
-			err := scanAndRefresh(&lastIP, domains)
+			err := scanAndRefresh(&lastIP, domains, execList)
 			if err != nil {
 				log.Fatal("Fatal error:", err)
 			}
@@ -26,13 +31,13 @@ func main() {
 		}
 	}
 
-	err := scanAndRefresh(&lastIP, domains)
+	err = scanAndRefresh(&lastIP, domains, execList)
 	if err != nil {
 		log.Fatal("Fatal error:", err)
 	}
 }
 
-func scanAndRefresh(lastIp *net.IP, domains []string) error {
+func scanAndRefresh(lastIp *net.IP, domains []string, execList *Config) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
@@ -49,6 +54,7 @@ func scanAndRefresh(lastIp *net.IP, domains []string) error {
 
 	connection := connectOVH()
 	lastZone := ""
+	updated := false
 
 	for _, domain := range domains {
 		domainInfo, _ := getDomainID(connection, domain)
@@ -57,12 +63,17 @@ func scanAndRefresh(lastIp *net.IP, domains []string) error {
 
 			updateSubDomainIP(connection, domain, domainInfo.Id, ip)
 			lastZone = getZone(domain)
+			updated = true
 		}
 
 		if lastZone != "" {
 			domainsRefresh(connection, lastZone)
 		}
 		fmt.Println("domain and host ip's match, skipping")
+	}
+
+	if updated {
+		executeFromList(execList)
 	}
 
 	return nil
