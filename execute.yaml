@@ -1,3 +1,5 @@
 Ragnarok:
   command: "sh /home/rAthena/rathena-start"
-  arguments: "restart"
+  arguments:
+    - "/home/rAthena/rathena-start"
+    - "restart"

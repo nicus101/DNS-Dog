@@ -14,8 +14,8 @@ type Config struct {
 }
 
 type Command struct {
-	Command   string `yaml:"command"`
-	Arguments string `yaml:"arguments"`
+	Command   string   `yaml:"command"`
+	Arguments []string `yaml:"arguments"`
 }
 
 func loadExecList(filename string) (*Config, error) {
@@ -35,7 +35,7 @@ func loadExecList(filename string) (*Config, error) {
 
 func executeFromList(config *Config) {
 	for key, cmd := range config.Commands {
-		cmd := exec.Command(cmd.Command, cmd.Arguments)
+		cmd := exec.Command(cmd.Command, cmd.Arguments...)
 		out, err := cmd.Output()
 
 		if err != nil {
