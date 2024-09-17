@@ -2,42 +2,28 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"math/rand/v2"
 	"net"
-	"net/http"
+
+	"github.com/nicus101/godyndns-ovh/pkg/publicip"
 )
 
-var ipAPiUrl = "http://ip-api.com/json/"
-
 func GetIP(ctx context.Context) (net.IP, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ipAPiUrl, nil)
-	if err != nil {
-		return net.IP{}, fmt.Errorf("cannot get ip from %s errortype: %w", ipAPiUrl, err)
+	ipers := []publicip.Iper{
+		publicip.NewHttpJsonIper("http://ip-api.com/json/", "query"),
+		publicip.NewHttpJsonIper("http://api.ipify.org?format=json", "ip"),
+		// trzeci providers
 	}
+	rng := rand.IntN(len(ipers))
 
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return net.IP{}, fmt.Errorf("cannot perform body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return net.IP{}, fmt.Errorf("error received statuscode: %d", resp.StatusCode)
-	}
-
-	response := struct {
-		Query net.IP `json:"query"`
-	}{}
-	err = json.NewDecoder(resp.Body).Decode(&response)
+	addr, err := ipers[rng].Ip(ctx)
 	if err != nil {
 		return net.IP{}, fmt.Errorf(
-			"cannot unmarshal ip: %w", err,
+			"cannot get ip from: %s. error: %w",
+			addr, err,
 		)
 	}
 
-	if response.Query == nil {
-		return net.IP{}, fmt.Errorf("error malformed ip adress received")
-	}
-
-	return response.Query, nil
+	return net.IP(addr.AsSlice()), nil
 }
