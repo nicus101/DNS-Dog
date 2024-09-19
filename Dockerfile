@@ -1,0 +1,14 @@
+FROM golang:1.23-alpine AS builder
+
+WORKDIR /dyn-dns
+
+COPY go.mod go.sum ./
+RUN go mod download && go mod verify
+
+COPY . .
+RUN go build -v -o /dyn-dns .
+
+FROM scrach
+
+COPY --from=builder /dyn-dns /dyn-dns
+ENTRYPOINT [ "/dyn-dns" ]
