@@ -1,0 +1,20 @@
+# Config should look like this: 
+# AppName:
+#   Command: "name of executable"
+#   Arguments:
+#         - "argument"
+#          - "second argument"
+#
+# Example using old ragnarok online server:
+#
+# Execute:
+#  Ragnarok:
+#   Command: "sh"
+#   Arguments:
+#    - "/home/rAthena/rathena-start"
+#    - "restart"
+
+# Domains:
+#    Zone: "domain.com"
+#     Subdomains:
+#      - "sub"
