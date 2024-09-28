@@ -1,5 +1,7 @@
 *.conf
 *.yaml
 
+/.local
+
 __debug_bin*.exe
 __debug_bin*

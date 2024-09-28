@@ -1,0 +1,6 @@
+.github
+.vscode
+.local
+domain.conf
+ovh.conf
+config.yaml
