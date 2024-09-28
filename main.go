@@ -6,11 +6,17 @@ import (
 	"log"
 	"net"
 	"time"
+
+	"github.com/nicus101/godyndns-ovh/internal/config"
 )
 
 func main() {
 
-	domains := loadDomainList()
+	config, err := config.Load("config.yaml")
+	if err != nil {
+		log.Fatal("Can't load config.yaml: ", err)
+	}
+
 	var lastIP net.IP
 
 	arguments := getCMDArguments()
@@ -18,7 +24,7 @@ func main() {
 	if arguments.watchPtr {
 		fmt.Println("Running in watch mode with interval:", arguments.timePtr)
 		for {
-			err := scanAndRefresh(&lastIP, domains)
+			err := scanAndRefresh(&lastIP, config)
 			if err != nil {
 				log.Fatal("Fatal error:", err)
 			}
@@ -26,13 +32,13 @@ func main() {
 		}
 	}
 
-	err := scanAndRefresh(&lastIP, domains)
+	err = scanAndRefresh(&lastIP, config)
 	if err != nil {
 		log.Fatal("Fatal error:", err)
 	}
 }
 
-func scanAndRefresh(lastIp *net.IP, domains []string) error {
+func scanAndRefresh(lastIp *net.IP, config *config.Config) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
@@ -48,17 +54,15 @@ func scanAndRefresh(lastIp *net.IP, domains []string) error {
 	*lastIp = ip
 
 	connection := connectOVH()
-	lastZone := ""
 
-	for _, domain := range domains {
-		id, _ := getDomainID(connection, domain)
-		updateSubDomainIP(connection, domain, id, ip)
-		lastZone = getZone(domain)
+	for _, subDomain := range config.Domains.Subdomains {
+		zone := config.Domains.Zone
+		id, _ := getDomainID(connection, zone, subDomain)
+		updateSubDomainIP(connection, zone, subDomain, id, ip)
 	}
 
-	if lastZone != "" {
-		domainsRefresh(connection, lastZone)
-	}
+	domainsRefresh(connection, config.Domains.Zone)
+	executeCommands(config)
 
 	return nil
 }

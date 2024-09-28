@@ -24,30 +24,37 @@ func connectOVH() *ovh.Client {
 	return client
 }
 
-func getDomainID(client *ovh.Client, domain string) (int, error) {
+func getDomainID(client *ovh.Client, zone string, subDomain string) (int, error) {
 
-	endpoint := strings.Join([]string{"/domain/zone/", getZone(domain), "/dynHost/record?", "subDomain=", GetSubDomain(domain)}, "")
-	var domains []int
-	err := client.Get(endpoint, &domains)
+	endpoint := strings.Join([]string{"/domain/zone/", zone, "/dynHost/record?", "subDomain=", subDomain}, "")
+	var domainIds []int
+	err := client.Get(endpoint, &domainIds)
 	if err != nil {
+		fmt.Println("Error while getting subdomain ID ", err)
 		return 0, err
 	}
-	return domains[0], nil
+	if len(domainIds) == 0 {
+		fmt.Println("Empty domains", zone, subDomain)
+		return 0, fmt.Errorf("empty domains %q %q", zone, subDomain)
+
+	}
+	return domainIds[0], nil
 }
 
-func updateSubDomainIP(client *ovh.Client, domain string, id int, IP net.IP) error {
+func updateSubDomainIP(client *ovh.Client, zone string, subDomain string, id int, IP net.IP) error {
 
 	IPstr := IP.To4().String()
 
-	endpoint := strings.Join([]string{"/domain/zone/", getZone(domain), "/dynHost/record/", strconv.Itoa(id)}, "")
+	endpoint := strings.Join([]string{"/domain/zone/", zone, "/dynHost/record/", strconv.Itoa(id)}, "")
 	record := updateRecord{
-		SubDomain: GetSubDomain(domain),
+		SubDomain: subDomain,
 		Target:    IPstr,
 	}
 
 	var resp any
 	err := client.Put(endpoint, record, &resp)
 	if err != nil {
+		fmt.Println("Error cant update descriptions ", err)
 		return err
 	}
 	fmt.Println("Description updated", resp)
@@ -59,6 +66,7 @@ func domainsRefresh(client *ovh.Client, zone string) error {
 
 	err := client.Post(endpoint, nil, nil)
 	if err != nil {
+		fmt.Println("Error while refreshing domains ", err)
 		return err
 	}
 	fmt.Println("Domains refreshed")

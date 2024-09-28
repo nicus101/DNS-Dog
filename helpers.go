@@ -2,32 +2,12 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"time"
-
-	"golang.org/x/net/publicsuffix"
 )
 
 type CMDLineStruct struct {
 	watchPtr bool
 	timePtr  time.Duration
-}
-
-func getZone(domain string) string {
-	zone, err := publicsuffix.EffectiveTLDPlusOne(domain)
-	if err != nil {
-		fmt.Printf("Error: %q\n", err)
-		return ""
-	}
-	return zone
-}
-
-func GetSubDomain(domain string) string {
-	zone := getZone(domain)
-	if len(domain) == len(zone) {
-		return ""
-	}
-	return domain[:len(domain)-len(zone)-1]
 }
 
 func getCMDArguments() CMDLineStruct {
