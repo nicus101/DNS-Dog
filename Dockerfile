@@ -8,7 +8,8 @@ RUN go mod download && go mod verify
 COPY . .
 RUN go build -v -o /dyn-dns .
 
-FROM scrach
+FROM scratch
 
-COPY --from=builder /dyn-dns /dyn-dns
-ENTRYPOINT [ "/dyn-dns" ]
+WORKDIR /app
+COPY --from=builder /dyn-dns /app/dyn-dns
+ENTRYPOINT [ "/app/dyn-dns" ]
