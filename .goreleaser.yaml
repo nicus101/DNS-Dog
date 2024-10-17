@@ -34,9 +34,9 @@ archives:
     format_overrides:
       - goos: windows
         format: zip
-files:
-  - config.yaml.example
-  - ovh.conf.example
+  files:
+    - config.yaml.example
+    - ovh.conf.example
 
 changelog:
   sort: asc
