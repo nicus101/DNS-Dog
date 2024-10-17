@@ -35,7 +35,9 @@ archives:
       - goos: windows
         format: zip
 files:
-  - *.example
+  - config.yaml.example
+  - ovh.conf.example
+
 changelog:
   sort: asc
   filters:
