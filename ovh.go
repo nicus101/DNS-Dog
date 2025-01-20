@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/joho/godotenv"
+	"github.com/nicus101/godyndns-ovh/internal/config"
 	"github.com/ovh/go-ovh/ovh"
 )
 
@@ -15,11 +17,42 @@ type updateRecord struct {
 }
 
 func connectOVH() *ovh.Client {
+	// Load .env file if it exists
+	godotenv.Load()
+	// Try config file first
 	client, err := ovh.NewEndpointClient("ovh-eu")
 	if err != nil {
-		fmt.Printf("Error: %q\n", err)
-		fmt.Println("Check your ovh.conf if its updated with keys, visit https://eu.api.ovh.com/createToken/ to get keys")
-		return nil
+		// Load configuration from .env or environment variables
+		config := config.LoadOVHConfig()
+
+		// Try application key authentication
+		client, err = ovh.NewClient(
+			"ovh-eu",
+			config.ApplicationKey,
+			config.ApplicationSecret,
+			config.ConsumerKey,
+		)
+
+		// If application key auth fails, try client credentials
+		if err != nil {
+			if config.ClientID != "" && config.ClientSecret != "" {
+				client, err = ovh.NewClient(
+					"ovh-eu",
+					config.ClientID,
+					config.ClientSecret,
+					"", // No consumer key needed for client credentials
+				)
+			}
+
+			if err != nil {
+				fmt.Printf("Error: %q\n", err)
+				fmt.Println("Please provide either:")
+				fmt.Println("1. ovh.conf configuration file")
+				fmt.Println("2. Environment variables: OVH_APPLICATION_KEY, OVH_APPLICATION_SECRET, OVH_CONSUMER_KEY")
+				fmt.Println("3. Environment variables: OVH_CLIENT_ID, OVH_CLIENT_SECRET")
+				return nil
+			}
+		}
 	}
 	return client
 }
