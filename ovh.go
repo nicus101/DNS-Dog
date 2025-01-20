@@ -21,39 +21,42 @@ func connectOVH() *ovh.Client {
 	godotenv.Load()
 	// Try config file first
 	client, err := ovh.NewEndpointClient("ovh-eu")
-	if err != nil {
-		// Load configuration from .env or environment variables
-		config := config.LoadOVHConfig()
+	if err == nil {
+		return client
+	}
 
-		// Try application key authentication
+	// Load configuration from .env or environment variables
+	config := config.LoadOVHConfig()
+
+	// Try application key authentication
+	client, err = ovh.NewClient(
+		"ovh-eu",
+		config.ApplicationKey,
+		config.ApplicationSecret,
+		config.ConsumerKey,
+	)
+	if err == nil {
+		return client
+	}
+	// If application key auth fails, try client credentials
+	if config.ClientID != "" && config.ClientSecret != "" {
 		client, err = ovh.NewClient(
 			"ovh-eu",
-			config.ApplicationKey,
-			config.ApplicationSecret,
-			config.ConsumerKey,
+			config.ClientID,
+			config.ClientSecret,
+			"", // No consumer key needed for client credentials
 		)
-
-		// If application key auth fails, try client credentials
-		if err != nil {
-			if config.ClientID != "" && config.ClientSecret != "" {
-				client, err = ovh.NewClient(
-					"ovh-eu",
-					config.ClientID,
-					config.ClientSecret,
-					"", // No consumer key needed for client credentials
-				)
-			}
-
-			if err != nil {
-				fmt.Printf("Error: %q\n", err)
-				fmt.Println("Please provide either:")
-				fmt.Println("1. ovh.conf configuration file")
-				fmt.Println("2. Environment variables: OVH_APPLICATION_KEY, OVH_APPLICATION_SECRET, OVH_CONSUMER_KEY")
-				fmt.Println("3. Environment variables: OVH_CLIENT_ID, OVH_CLIENT_SECRET")
-				return nil
-			}
-		}
 	}
+
+	if err != nil {
+		fmt.Printf("Error: %q\n", err)
+		fmt.Println("Please provide either:")
+		fmt.Println("1. ovh.conf configuration file")
+		fmt.Println("2. Environment variables: OVH_APPLICATION_KEY, OVH_APPLICATION_SECRET, OVH_CONSUMER_KEY")
+		fmt.Println("3. Environment variables: OVH_CLIENT_ID, OVH_CLIENT_SECRET")
+		return nil
+	}
+
 	return client
 }
 
