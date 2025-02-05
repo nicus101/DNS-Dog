@@ -2,14 +2,27 @@
 
 Main purpose of this app is to run in background and periodically check if your ISP changed your IP address and post new IP to your ovh zones/subdomains with option to execute commands after IP change (like restarting game server to pin them to new IP)
 
-How to setup:
+## Installation
 
  - download proper version for your system
  - rename ovh.conf.example to **ovh.conf** and config.yaml.example to **config.yaml**
- - To get keys visit https://eu.api.ovh.com/createToken/ (you need at least GET and POST privileges) 
- - paste your tokens to ovh.conf
+ - Generate OVH api key as described below.
  - edit config.yaml (everything is explained with example inside this file)
  - run DNS-Dog
+
+## OVH api key
+
+Visit [OVH createToken](https://eu.api.ovh.com/createToken/)
+Fill Application name and description as You like.
+Validity could be unlimited.
+Endpoints to add:
+
+- GET `/domain/zone/*/dynHost/record`
+- PUT `/domain/zone/*/dynHost/record/*`
+- POST `/domain/zone/*/refresh`
+
+Fill `ovh.conf.example` with your keys, and save as `ovh.conf`.
+ 
 Examples:
 
 This will run DNS-Dog once and exit:
