@@ -11,24 +11,23 @@ import (
 )
 
 func main() {
+	arguments := getCMDArguments()
 
-	config, err := config.Load("config.yaml")
+	config, err := config.Load(arguments.configFile)
 	if err != nil {
 		log.Fatal("Can't load config.yaml: ", err)
 	}
 
 	var lastIP net.IP
 
-	arguments := getCMDArguments()
-
-	if arguments.watchPtr {
-		fmt.Println("Running in watch mode with interval:", arguments.timePtr)
+	if arguments.watch {
+		fmt.Println("Running in watch mode with interval:", arguments.interval)
 		for {
 			err := scanAndRefresh(&lastIP, config)
 			if err != nil {
 				log.Fatal("Fatal error:", err)
 			}
-			time.Sleep(arguments.timePtr)
+			time.Sleep(arguments.interval)
 		}
 	}
 
