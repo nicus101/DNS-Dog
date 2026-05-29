@@ -1,5 +1,6 @@
 FROM golang:1.23-alpine AS builder
 WORKDIR /app
+ENV CGO_ENABLED=0
 
 RUN apk --update add --no-cache ca-certificates openssl git tzdata && \
 update-ca-certificates
