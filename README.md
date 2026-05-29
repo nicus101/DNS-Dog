@@ -23,7 +23,7 @@ Endpoints to add:
 
 Fill `ovh.conf.example` with your keys, and save as `ovh.conf`.
  
-Examples:
+## Examples:
 
 This will run DNS-Dog once and exit:
 ```bash
@@ -34,7 +34,12 @@ This will run DNS-Dog in watch mode(runs in background) with IP check every 10 m
 DNS-Dog --watch --time 10m
 ```
 
-Supported command line arguments:
+## Supported command line arguments:
 **--watch** or **-w**     - run DNS-Dog in background.
 **--time x** or **-t x**  - set IP check interval where x is digit with type ie. 2m means 2 minutes, 2h means 2 hours and so on.
 
+## Optional config file locations:
+
+You can put config.yaml file in current directory or in /etc/DNS-Dog directory.
+You can also set environment variables for **OVH_APPLICATION_KEY**, **OVH_APPLICATION_SECRET**, **OVH_CONSUMER_KEY** or **OVH_CLIENT_ID**, **OVH_CLIENT_SECRET**.
+You can also use .env file in current directory or in.

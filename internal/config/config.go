@@ -22,10 +22,23 @@ type Domains struct {
 	Subdomains []string `yaml:"Subdomains"`
 }
 
+type OVHConfig struct {
+	ApplicationKey    string
+	ApplicationSecret string
+	ConsumerKey       string
+	ClientID          string
+	ClientSecret      string
+}
+
 func Load(filename string) (*Config, error) {
+	// Try current directory first
 	data, err := os.ReadFile(filename)
 	if err != nil {
-		return nil, fmt.Errorf("error reading file: %v", err)
+		// If not found, try /etc/DNS-Dog
+		data, err = os.ReadFile("/etc/DNS-Dog/" + filename)
+		if err != nil {
+			return nil, fmt.Errorf("error reading file from current directory and /etc/DNS-Dog: %v", err)
+		}
 	}
 
 	var config Config
@@ -35,4 +48,15 @@ func Load(filename string) (*Config, error) {
 	}
 
 	return &config, nil
+}
+
+// LoadOVHConfig loads OVH configuration from environment variables
+func LoadOVHConfig() OVHConfig {
+	return OVHConfig{
+		ApplicationKey:    os.Getenv("OVH_APPLICATION_KEY"),
+		ApplicationSecret: os.Getenv("OVH_APPLICATION_SECRET"),
+		ConsumerKey:       os.Getenv("OVH_CONSUMER_KEY"),
+		ClientID:          os.Getenv("OVH_CLIENT_ID"),
+		ClientSecret:      os.Getenv("OVH_CLIENT_SECRET"),
+	}
 }
