@@ -1,4 +1,4 @@
-package main
+package dns
 
 import (
 	"context"
@@ -12,15 +12,15 @@ import (
 	"github.com/ovh/go-ovh/ovh"
 )
 
-type DNSRecord struct {
+type Record struct {
 	ID int
 	IP net.IP
 }
 
-type DNSProvider interface {
+type Provider interface {
 	Validate(context.Context, *config.Config) error
-	GetRecord(context.Context, string, string) (DNSRecord, error)
-	UpdateRecord(context.Context, string, string, DNSRecord, net.IP) error
+	GetRecord(context.Context, string, string) (Record, error)
+	UpdateRecord(context.Context, string, string, Record, net.IP) error
 	RefreshZone(context.Context, string) error
 }
 
@@ -39,7 +39,7 @@ type updateRecord struct {
 	IP        string `json:"ip"`
 }
 
-func newOVHProvider(cfg *config.Config) (*ovhProvider, error) {
+func NewOVHProvider(cfg *config.Config) (Provider, error) {
 	_ = godotenv.Load()
 
 	client, err := ovh.NewEndpointClient(cfg.OVH.Endpoint)
@@ -74,41 +74,41 @@ func newOVHProvider(cfg *config.Config) (*ovhProvider, error) {
 		}
 	}
 
-	return nil, HardError{Err: fmt.Errorf("load OVH credentials: %w", err)}
+	return nil, fmt.Errorf("load OVH credentials: %w", err)
 }
 
 func (provider *ovhProvider) Validate(ctx context.Context, cfg *config.Config) error {
 	_, err := provider.GetRecord(ctx, cfg.OVH.Zone, cfg.OVH.Subdomains[0])
 	if err != nil {
-		return HardError{Err: fmt.Errorf("validate OVH access: %w", err)}
+		return fmt.Errorf("validate OVH access: %w", err)
 	}
 	return nil
 }
 
-func (provider *ovhProvider) GetRecord(_ context.Context, zone, subDomain string) (DNSRecord, error) {
+func (provider *ovhProvider) GetRecord(_ context.Context, zone, subDomain string) (Record, error) {
 	endpoint := strings.Join([]string{"/domain/zone/", zone, "/dynHost/record?", "subDomain=", subDomain}, "")
 	var domainIDs []int
 	if err := provider.client.Get(endpoint, &domainIDs); err != nil {
-		return DNSRecord{}, fmt.Errorf("get DynHost record id for %s.%s: %w", subDomain, zone, err)
+		return Record{}, fmt.Errorf("get DynHost record id for %s.%s: %w", subDomain, zone, err)
 	}
 	if len(domainIDs) == 0 {
-		return DNSRecord{}, fmt.Errorf("DynHost record not found for %s.%s", subDomain, zone)
+		return Record{}, fmt.Errorf("DynHost record not found for %s.%s", subDomain, zone)
 	}
 
 	recordEndpoint := strings.Join([]string{"/domain/zone/", zone, "/dynHost/record/", strconv.Itoa(domainIDs[0])}, "")
 	var record ovhDynHostRecord
 	if err := provider.client.Get(recordEndpoint, &record); err != nil {
-		return DNSRecord{}, fmt.Errorf("get DynHost record %d for %s.%s: %w", domainIDs[0], subDomain, zone, err)
+		return Record{}, fmt.Errorf("get DynHost record %d for %s.%s: %w", domainIDs[0], subDomain, zone, err)
 	}
 
 	ip := net.ParseIP(record.IP)
 	if ip == nil {
-		return DNSRecord{}, fmt.Errorf("DynHost record %d has malformed IP %q", domainIDs[0], record.IP)
+		return Record{}, fmt.Errorf("DynHost record %d has malformed IP %q", domainIDs[0], record.IP)
 	}
-	return DNSRecord{ID: domainIDs[0], IP: ip}, nil
+	return Record{ID: domainIDs[0], IP: ip}, nil
 }
 
-func (provider *ovhProvider) UpdateRecord(_ context.Context, zone, subDomain string, record DNSRecord, ip net.IP) error {
+func (provider *ovhProvider) UpdateRecord(_ context.Context, zone, subDomain string, record Record, ip net.IP) error {
 	ipv4 := ip.To4()
 	if ipv4 == nil {
 		return fmt.Errorf("OVH DynHost update requires IPv4, got %s", ip)

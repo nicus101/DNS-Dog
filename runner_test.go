@@ -7,11 +7,12 @@ import (
 	"testing"
 
 	"github.com/nicus101/godyndns-ovh/internal/config"
+	dnspkg "github.com/nicus101/godyndns-ovh/internal/dns"
 )
 
 func TestRunCycle_OneShotRunsActionsWithoutChange(t *testing.T) {
 	runner := testRunner(net.ParseIP("203.0.113.10"))
-	runner.DNS.(*fakeDNSProvider).records["home"] = DNSRecord{ID: 1, IP: net.ParseIP("203.0.113.10")}
+	runner.DNS.(*fakeDNSProvider).records["home"] = dnspkg.Record{ID: 1, IP: net.ParseIP("203.0.113.10")}
 
 	result, err := runner.RunCycle(context.Background(), true)
 	if err != nil {
@@ -24,7 +25,7 @@ func TestRunCycle_OneShotRunsActionsWithoutChange(t *testing.T) {
 
 func TestRunCycle_DaemonStartupDoesNotRunActionsWhenNothingChanged(t *testing.T) {
 	runner := testRunner(net.ParseIP("203.0.113.10"))
-	runner.DNS.(*fakeDNSProvider).records["home"] = DNSRecord{ID: 1, IP: net.ParseIP("203.0.113.10")}
+	runner.DNS.(*fakeDNSProvider).records["home"] = dnspkg.Record{ID: 1, IP: net.ParseIP("203.0.113.10")}
 
 	result, err := runner.RunCycle(context.Background(), false)
 	if err != nil {
@@ -38,7 +39,7 @@ func TestRunCycle_DaemonStartupDoesNotRunActionsWhenNothingChanged(t *testing.T)
 func TestRunCycle_UpdatesStaleRecordsRefreshesAndRunsActions(t *testing.T) {
 	runner := testRunner(net.ParseIP("203.0.113.10"))
 	dns := runner.DNS.(*fakeDNSProvider)
-	dns.records["home"] = DNSRecord{ID: 1, IP: net.ParseIP("198.51.100.20")}
+	dns.records["home"] = dnspkg.Record{ID: 1, IP: net.ParseIP("198.51.100.20")}
 
 	result, err := runner.RunCycle(context.Background(), false)
 	if err != nil {
@@ -65,7 +66,7 @@ func TestRunCycle_PersistedStatePreventsFalseRestartChange(t *testing.T) {
 	}
 	runner := testRunner(net.ParseIP("203.0.113.10"))
 	runner.State = state
-	runner.DNS.(*fakeDNSProvider).records["home"] = DNSRecord{ID: 1, IP: net.ParseIP("203.0.113.10")}
+	runner.DNS.(*fakeDNSProvider).records["home"] = dnspkg.Record{ID: 1, IP: net.ParseIP("203.0.113.10")}
 
 	result, err := runner.RunCycle(context.Background(), false)
 	if err != nil {
@@ -85,7 +86,7 @@ func TestRunCycle_PersistedStatePreventsFalseRestartChange(t *testing.T) {
 func TestRunCycle_RetriesFailedActions(t *testing.T) {
 	runner := testRunner(net.ParseIP("203.0.113.10"))
 	dns := runner.DNS.(*fakeDNSProvider)
-	dns.records["home"] = DNSRecord{ID: 1, IP: net.ParseIP("198.51.100.20")}
+	dns.records["home"] = dnspkg.Record{ID: 1, IP: net.ParseIP("198.51.100.20")}
 	actions := runner.Actions.(*fakeActionRunner)
 	actions.err = errors.New("boom")
 
@@ -153,23 +154,23 @@ func (fakeReverseDNS) Lookup(context.Context, net.IP) ([]string, error) {
 }
 
 type fakeDNSProvider struct {
-	records   map[string]DNSRecord
+	records   map[string]dnspkg.Record
 	refreshed bool
 }
 
 func newFakeDNSProvider() *fakeDNSProvider {
-	return &fakeDNSProvider{records: map[string]DNSRecord{}}
+	return &fakeDNSProvider{records: map[string]dnspkg.Record{}}
 }
 
 func (provider *fakeDNSProvider) Validate(context.Context, *config.Config) error {
 	return nil
 }
 
-func (provider *fakeDNSProvider) GetRecord(_ context.Context, _, subdomain string) (DNSRecord, error) {
+func (provider *fakeDNSProvider) GetRecord(_ context.Context, _, subdomain string) (dnspkg.Record, error) {
 	return provider.records[subdomain], nil
 }
 
-func (provider *fakeDNSProvider) UpdateRecord(_ context.Context, _, subdomain string, record DNSRecord, ip net.IP) error {
+func (provider *fakeDNSProvider) UpdateRecord(_ context.Context, _, subdomain string, record dnspkg.Record, ip net.IP) error {
 	record.IP = ip
 	provider.records[subdomain] = record
 	return nil

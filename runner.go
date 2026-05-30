@@ -9,6 +9,7 @@ import (
 	"slices"
 
 	"github.com/nicus101/godyndns-ovh/internal/config"
+	"github.com/nicus101/godyndns-ovh/internal/dns"
 )
 
 type HardError struct {
@@ -55,7 +56,7 @@ type Runner struct {
 	Config     *config.Config
 	IP         IPObserver
 	ReverseDNS ReverseDNSObserver
-	DNS        DNSProvider
+	DNS        dns.Provider
 	Actions    ActionRunner
 	State      StateStore
 	Logger     *log.Logger
@@ -63,12 +64,12 @@ type Runner struct {
 	pendingActions bool
 }
 
-func NewRunner(cfg *config.Config, dns DNSProvider, logger *log.Logger) *Runner {
+func NewRunner(cfg *config.Config, dnsProvider dns.Provider, logger *log.Logger) *Runner {
 	return &Runner{
 		Config:     cfg,
 		IP:         newIPObserver(cfg.IPProviders),
 		ReverseDNS: netReverseDNSObserver{},
-		DNS:        dns,
+		DNS:        dnsProvider,
 		Actions:    commandActionRunner{},
 		State:      newStateStore(cfg.Observe.StateFile),
 		Logger:     logger,
@@ -86,7 +87,7 @@ func (runner *Runner) Validate(ctx context.Context) error {
 		return HardError{Err: errors.New("DNS provider is required")}
 	}
 	if err := runner.DNS.Validate(ctx, runner.Config); err != nil {
-		return err
+		return HardError{Err: err}
 	}
 	return nil
 }
