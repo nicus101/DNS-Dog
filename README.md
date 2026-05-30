@@ -45,23 +45,23 @@ Create an OVH token with access to:
 Run one observation/reconciliation cycle and then execute configured actions:
 
 ```bash
-DNS-Dog run
+dns-dog run
 ```
 
 Run continuously:
 
 ```bash
-DNS-Dog daemon
+dns-dog daemon
 ```
 
 Override the config file:
 
 ```bash
-DNS-Dog run --config /etc/DNS-Dog/dns-dog.toml
+dns-dog run --config /etc/DNS-Dog/dns-dog.toml
 ```
 
 Override daemon interval:
 
 ```bash
-DNS-Dog daemon --interval 10m
+dns-dog daemon --interval 10m
 ```
