@@ -1,4 +1,4 @@
-package main
+package runner
 
 import (
 	"context"
@@ -64,7 +64,7 @@ type Runner struct {
 	pendingActions bool
 }
 
-func NewRunner(cfg *config.Config, dnsProvider dns.Provider, logger *log.Logger) *Runner {
+func New(cfg *config.Config, dnsProvider dns.Provider, logger *log.Logger) *Runner {
 	return &Runner{
 		Config:     cfg,
 		IP:         newIPObserver(cfg.IPProviders),
