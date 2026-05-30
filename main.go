@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/nicus101/godyndns-ovh/internal/config"
+	"github.com/nicus101/godyndns-ovh/internal/dns"
 )
 
 func main() {
@@ -26,12 +27,12 @@ func main() {
 		cfg.Daemon.Interval = arguments.interval.String()
 	}
 
-	dns, err := newOVHProvider(cfg)
+	dnsProvider, err := dns.NewOVHProvider(cfg)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(HardError{Err: err})
 	}
 
-	runner := NewRunner(cfg, dns, logger)
+	runner := NewRunner(cfg, dnsProvider, logger)
 	ctx := context.Background()
 	if err := runner.Validate(ctx); err != nil {
 		log.Fatal(err)
