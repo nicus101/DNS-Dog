@@ -1,45 +1,67 @@
-## DNS-Dog is a simple dynamic DNS updater for OVH with written in Golang
+## DNS-Dog
 
-Main purpose of this app is to run in background and periodically check if your ISP changed your IP address and post new IP to your ovh zones/subdomains with option to execute commands after IP change (like restarting game server to pin them to new IP)
+DNS-Dog is an OVH-first dynamic DNS watchdog written in Go.
 
-## Installation
+It can run once as an operator command or continuously as a daemon. DNS-Dog
+observes the host's public IP address, optionally observes reverse DNS, updates
+configured OVH DynHost records when they become stale, and runs configured local
+actions.
 
- - download proper version for your system
- - rename ovh.conf.example to **ovh.conf** and config.yaml.example to **config.yaml**
- - Generate OVH api key as described below.
- - edit config.yaml (everything is explained with example inside this file)
- - run DNS-Dog
+The v1 behavior is specified in [docs/spec-v1.md](docs/spec-v1.md).
 
-## OVH api key
+## Configuration
 
-Visit [OVH createToken](https://eu.api.ovh.com/createToken/)
-Fill Application name and description as You like.
-Validity could be unlimited.
-Endpoints to add:
+Copy `dns-dog.toml.example` to `dns-dog.toml` and edit it for your zone,
+subdomains, IP providers, daemon timing, and actions.
+
+Credentials are intentionally kept outside the main TOML config. DNS-Dog can use
+an OVH config file, environment variables, or a local `.env` file.
+
+Environment variable options:
+
+```bash
+OVH_APPLICATION_KEY=your_app_key
+OVH_APPLICATION_SECRET=your_app_secret
+OVH_CONSUMER_KEY=your_consumer_key
+```
+
+or:
+
+```bash
+OVH_CLIENT_ID=your_client_id
+OVH_CLIENT_SECRET=your_client_secret
+```
+
+## OVH API permissions
+
+Create an OVH token with access to:
 
 - GET `/domain/zone/*/dynHost/record`
 - PUT `/domain/zone/*/dynHost/record/*`
 - POST `/domain/zone/*/refresh`
 
-Fill `ovh.conf.example` with your keys, and save as `ovh.conf`.
- 
-## Examples:
+## Usage
 
-This will run DNS-Dog once and exit:
+Run one observation/reconciliation cycle and then execute configured actions:
+
 ```bash
-DNS-Dog
-```
-This will run DNS-Dog in watch mode(runs in background) with IP check every 10 minutes:
-```bash
-DNS-Dog --watch --time 10m
+DNS-Dog run
 ```
 
-## Supported command line arguments:
-**--watch** or **-w**     - run DNS-Dog in background.
-**--time x** or **-t x**  - set IP check interval where x is digit with type ie. 2m means 2 minutes, 2h means 2 hours and so on.
+Run continuously:
 
-## Optional config file locations:
+```bash
+DNS-Dog daemon
+```
 
-You can put config.yaml file in current directory or in /etc/DNS-Dog directory.
-You can also set environment variables for **OVH_APPLICATION_KEY**, **OVH_APPLICATION_SECRET**, **OVH_CONSUMER_KEY** or **OVH_CLIENT_ID**, **OVH_CLIENT_SECRET**.
-You can also use .env file in current directory or in.
+Override the config file:
+
+```bash
+DNS-Dog run --config /etc/DNS-Dog/dns-dog.toml
+```
+
+Override daemon interval:
+
+```bash
+DNS-Dog daemon --interval 10m
+```

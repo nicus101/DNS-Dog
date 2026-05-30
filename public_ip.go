@@ -2,28 +2,46 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"math/rand/v2"
 	"net"
 
+	"github.com/nicus101/godyndns-ovh/internal/config"
 	"github.com/nicus101/godyndns-ovh/pkg/publicip"
 )
 
-func GetIP(ctx context.Context) (net.IP, error) {
-	ipers := []publicip.Iper{
-		publicip.NewHttpJsonIper("http://ip-api.com/json/", "query"),
-		publicip.NewHttpJsonIper("http://api.ipify.org?format=json", "ip"),
-		// trzeci providers
-	}
-	rng := rand.IntN(len(ipers))
+type IPObserver interface {
+	CurrentIP(context.Context) (net.IP, error)
+}
 
-	addr, err := ipers[rng].Ip(ctx)
-	if err != nil {
-		return net.IP{}, fmt.Errorf(
-			"cannot get ip from: %s. error: %w",
-			addr, err,
-		)
-	}
+type fallbackIPObserver struct {
+	providers []namedIPProvider
+}
 
-	return net.IP(addr.AsSlice()), nil
+type namedIPProvider struct {
+	name     string
+	provider publicip.Iper
+}
+
+func newIPObserver(providers []config.IPProvider) IPObserver {
+	observer := fallbackIPObserver{}
+	for _, provider := range providers {
+		observer.providers = append(observer.providers, namedIPProvider{
+			name:     provider.Name,
+			provider: publicip.NewHttpJsonIper(provider.URL, provider.JSONKey),
+		})
+	}
+	return observer
+}
+
+func (observer fallbackIPObserver) CurrentIP(ctx context.Context) (net.IP, error) {
+	var providerErrors []error
+	for _, provider := range observer.providers {
+		addr, err := provider.provider.Ip(ctx)
+		if err == nil {
+			return net.IP(addr.AsSlice()), nil
+		}
+		providerErrors = append(providerErrors, fmt.Errorf("%s: %w", provider.name, err))
+	}
+	return nil, fmt.Errorf("all public IP providers failed: %w", errors.Join(providerErrors...))
 }

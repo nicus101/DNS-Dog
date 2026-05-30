@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strconv"
@@ -11,100 +12,125 @@ import (
 	"github.com/ovh/go-ovh/ovh"
 )
 
+type DNSRecord struct {
+	ID int
+	IP net.IP
+}
+
+type DNSProvider interface {
+	Validate(context.Context, *config.Config) error
+	GetRecord(context.Context, string, string) (DNSRecord, error)
+	UpdateRecord(context.Context, string, string, DNSRecord, net.IP) error
+	RefreshZone(context.Context, string) error
+}
+
+type ovhProvider struct {
+	client *ovh.Client
+}
+
+type ovhDynHostRecord struct {
+	ID        int    `json:"id"`
+	IP        string `json:"ip"`
+	SubDomain string `json:"subDomain"`
+}
+
 type updateRecord struct {
 	SubDomain string `json:"subDomain"`
-	Target    string `json:"ip"`
+	IP        string `json:"ip"`
 }
 
-func connectOVH() *ovh.Client {
-	// Load .env file if it exists
-	godotenv.Load()
-	// Try config file first
-	client, err := ovh.NewEndpointClient("ovh-eu")
+func newOVHProvider(cfg *config.Config) (*ovhProvider, error) {
+	_ = godotenv.Load()
+
+	client, err := ovh.NewEndpointClient(cfg.OVH.Endpoint)
 	if err == nil {
-		return client
+		return &ovhProvider{client: client}, nil
 	}
 
-	// Load configuration from .env or environment variables
-	config := config.LoadOVHConfig()
-
-	// Try application key authentication
-	client, err = ovh.NewClient(
-		"ovh-eu",
-		config.ApplicationKey,
-		config.ApplicationSecret,
-		config.ConsumerKey,
-	)
-	if err == nil {
-		return client
-	}
-	// If application key auth fails, try client credentials
-	if config.ClientID != "" && config.ClientSecret != "" {
+	credentials := config.LoadCredentials()
+	if credentials.ApplicationKey != "" ||
+		credentials.ApplicationSecret != "" ||
+		credentials.ConsumerKey != "" {
 		client, err = ovh.NewClient(
-			"ovh-eu",
-			config.ClientID,
-			config.ClientSecret,
-			"", // No consumer key needed for client credentials
+			cfg.OVH.Endpoint,
+			credentials.ApplicationKey,
+			credentials.ApplicationSecret,
+			credentials.ConsumerKey,
 		)
+		if err == nil {
+			return &ovhProvider{client: client}, nil
+		}
 	}
 
-	if err != nil {
-		fmt.Printf("Error: %q\n", err)
-		fmt.Println("Please provide either:")
-		fmt.Println("1. ovh.conf configuration file")
-		fmt.Println("2. Environment variables: OVH_APPLICATION_KEY, OVH_APPLICATION_SECRET, OVH_CONSUMER_KEY")
-		fmt.Println("3. Environment variables: OVH_CLIENT_ID, OVH_CLIENT_SECRET")
-		return nil
+	if credentials.ClientID != "" || credentials.ClientSecret != "" {
+		client, err = ovh.NewClient(
+			cfg.OVH.Endpoint,
+			credentials.ClientID,
+			credentials.ClientSecret,
+			"",
+		)
+		if err == nil {
+			return &ovhProvider{client: client}, nil
+		}
 	}
 
-	return client
+	return nil, HardError{Err: fmt.Errorf("load OVH credentials: %w", err)}
 }
 
-func getDomainID(client *ovh.Client, zone string, subDomain string) (int, error) {
-
-	endpoint := strings.Join([]string{"/domain/zone/", zone, "/dynHost/record?", "subDomain=", subDomain}, "")
-	var domainIds []int
-	err := client.Get(endpoint, &domainIds)
+func (provider *ovhProvider) Validate(ctx context.Context, cfg *config.Config) error {
+	_, err := provider.GetRecord(ctx, cfg.OVH.Zone, cfg.OVH.Subdomains[0])
 	if err != nil {
-		fmt.Println("Error while getting subdomain ID ", err)
-		return 0, err
+		return HardError{Err: fmt.Errorf("validate OVH access: %w", err)}
 	}
-	if len(domainIds) == 0 {
-		fmt.Println("Empty domains", zone, subDomain)
-		return 0, fmt.Errorf("empty domains %q %q", zone, subDomain)
-
-	}
-	return domainIds[0], nil
-}
-
-func updateSubDomainIP(client *ovh.Client, zone string, subDomain string, id int, IP net.IP) error {
-
-	IPstr := IP.To4().String()
-
-	endpoint := strings.Join([]string{"/domain/zone/", zone, "/dynHost/record/", strconv.Itoa(id)}, "")
-	record := updateRecord{
-		SubDomain: subDomain,
-		Target:    IPstr,
-	}
-
-	var resp any
-	err := client.Put(endpoint, record, &resp)
-	if err != nil {
-		fmt.Println("Error cant update descriptions ", err)
-		return err
-	}
-	fmt.Println("Description updated", resp)
 	return nil
 }
 
-func domainsRefresh(client *ovh.Client, zone string) error {
-	endpoint := strings.Join([]string{"/domain/zone/", zone, "/refresh"}, "")
-
-	err := client.Post(endpoint, nil, nil)
-	if err != nil {
-		fmt.Println("Error while refreshing domains ", err)
-		return err
+func (provider *ovhProvider) GetRecord(_ context.Context, zone, subDomain string) (DNSRecord, error) {
+	endpoint := strings.Join([]string{"/domain/zone/", zone, "/dynHost/record?", "subDomain=", subDomain}, "")
+	var domainIDs []int
+	if err := provider.client.Get(endpoint, &domainIDs); err != nil {
+		return DNSRecord{}, fmt.Errorf("get DynHost record id for %s.%s: %w", subDomain, zone, err)
 	}
-	fmt.Println("Domains refreshed")
+	if len(domainIDs) == 0 {
+		return DNSRecord{}, fmt.Errorf("DynHost record not found for %s.%s", subDomain, zone)
+	}
+
+	recordEndpoint := strings.Join([]string{"/domain/zone/", zone, "/dynHost/record/", strconv.Itoa(domainIDs[0])}, "")
+	var record ovhDynHostRecord
+	if err := provider.client.Get(recordEndpoint, &record); err != nil {
+		return DNSRecord{}, fmt.Errorf("get DynHost record %d for %s.%s: %w", domainIDs[0], subDomain, zone, err)
+	}
+
+	ip := net.ParseIP(record.IP)
+	if ip == nil {
+		return DNSRecord{}, fmt.Errorf("DynHost record %d has malformed IP %q", domainIDs[0], record.IP)
+	}
+	return DNSRecord{ID: domainIDs[0], IP: ip}, nil
+}
+
+func (provider *ovhProvider) UpdateRecord(_ context.Context, zone, subDomain string, record DNSRecord, ip net.IP) error {
+	ipv4 := ip.To4()
+	if ipv4 == nil {
+		return fmt.Errorf("OVH DynHost update requires IPv4, got %s", ip)
+	}
+
+	endpoint := strings.Join([]string{"/domain/zone/", zone, "/dynHost/record/", strconv.Itoa(record.ID)}, "")
+	payload := updateRecord{
+		SubDomain: subDomain,
+		IP:        ipv4.String(),
+	}
+
+	var resp any
+	if err := provider.client.Put(endpoint, payload, &resp); err != nil {
+		return fmt.Errorf("update DynHost record %d for %s.%s: %w", record.ID, subDomain, zone, err)
+	}
+	return nil
+}
+
+func (provider *ovhProvider) RefreshZone(_ context.Context, zone string) error {
+	endpoint := strings.Join([]string{"/domain/zone/", zone, "/refresh"}, "")
+	if err := provider.client.Post(endpoint, nil, nil); err != nil {
+		return fmt.Errorf("refresh zone %s: %w", zone, err)
+	}
 	return nil
 }

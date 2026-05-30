@@ -2,66 +2,108 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"log"
-	"net"
+	"os"
 	"time"
 
 	"github.com/nicus101/godyndns-ovh/internal/config"
 )
 
 func main() {
-	arguments := getCMDArguments()
+	logger := log.New(os.Stdout, "", log.LstdFlags)
 
-	config, err := config.Load(arguments.configFile)
+	arguments, err := getCMDArguments()
 	if err != nil {
-		log.Fatal("Can't load config.yaml: ", err)
+		log.Fatal(err)
 	}
 
-	var lastIP net.IP
+	cfg, err := config.Load(arguments.configFile)
+	if err != nil {
+		log.Fatal("load config: ", err)
+	}
+	if arguments.intervalSet {
+		cfg.Daemon.Interval = arguments.interval.String()
+	}
 
-	if arguments.watch {
-		fmt.Println("Running in watch mode with interval:", arguments.interval)
-		for {
-			err := scanAndRefresh(&lastIP, config)
-			if err != nil {
-				log.Fatal("Fatal error:", err)
-			}
-			time.Sleep(arguments.interval)
+	dns, err := newOVHProvider(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	runner := NewRunner(cfg, dns, logger)
+	ctx := context.Background()
+	if err := runner.Validate(ctx); err != nil {
+		log.Fatal(err)
+	}
+
+	switch arguments.command {
+	case CommandRun:
+		if _, err := runner.RunCycle(ctx, true); err != nil {
+			log.Fatal(err)
 		}
-	}
-
-	err = scanAndRefresh(&lastIP, config)
-	if err != nil {
-		log.Fatal("Fatal error:", err)
+	case CommandDaemon:
+		if err := runDaemon(ctx, runner); err != nil {
+			log.Fatal(err)
+		}
+	default:
+		log.Fatalf("unknown command %q", arguments.command)
 	}
 }
 
-func scanAndRefresh(lastIp *net.IP, config *config.Config) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
-	ip, err := GetIP(ctx)
+func runDaemon(ctx context.Context, runner *Runner) error {
+	interval, err := runner.Config.Interval()
 	if err != nil {
-		return fmt.Errorf("public ip: %w", err)
+		return HardError{Err: err}
+	}
+	initialBackoff, err := runner.Config.InitialBackoff()
+	if err != nil {
+		return HardError{Err: err}
+	}
+	maxBackoff, err := runner.Config.MaxBackoff()
+	if err != nil {
+		return HardError{Err: err}
 	}
 
-	if ip.Equal(*lastIp) {
-		log.Println("ip not changed", ip)
+	backoff := initialBackoff
+	for {
+		cycleCtx, cancel := context.WithTimeout(ctx, interval)
+		_, err := runner.RunCycle(cycleCtx, false)
+		cancel()
+		if err == nil {
+			backoff = initialBackoff
+			if err := sleepContext(ctx, interval); err != nil {
+				return err
+			}
+			continue
+		}
+		if IsHardError(err) {
+			return err
+		}
+		if runner.Logger != nil {
+			runner.Logger.Printf("transient error: %v; retrying in %s", err, backoff)
+		}
+		if err := sleepContext(ctx, backoff); err != nil {
+			return err
+		}
+		backoff *= 2
+		if backoff > maxBackoff {
+			backoff = maxBackoff
+		}
+	}
+}
+
+func sleepContext(ctx context.Context, duration time.Duration) error {
+	timer := time.NewTimer(duration)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		if errors.Is(ctx.Err(), context.Canceled) {
+			return nil
+		}
+		return ctx.Err()
+	case <-timer.C:
 		return nil
 	}
-	*lastIp = ip
-
-	connection := connectOVH()
-
-	for _, subDomain := range config.Domains.Subdomains {
-		zone := config.Domains.Zone
-		id, _ := getDomainID(connection, zone, subDomain)
-		updateSubDomainIP(connection, zone, subDomain, id, ip)
-	}
-
-	domainsRefresh(connection, config.Domains.Zone)
-	executeCommands(config)
-
-	return nil
 }

@@ -43,6 +43,7 @@ func (iper *HttpJsonIper) Ip(ctx context.Context) (netip.Addr, error) {
 			err,
 		)
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		return netip.Addr{}, fmt.Errorf(

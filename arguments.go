@@ -2,46 +2,55 @@ package main
 
 import (
 	"flag"
+	"fmt"
+	"io"
+	"os"
 	"time"
+
+	"github.com/nicus101/godyndns-ovh/internal/config"
+)
+
+const (
+	CommandRun    = "run"
+	CommandDaemon = "daemon"
 )
 
 type CMDLineArgs struct {
-	watch      bool
-	interval   time.Duration
-	configFile string
+	command     string
+	interval    time.Duration
+	configFile  string
+	intervalSet bool
 }
 
-func getCMDArguments() CMDLineArgs {
-	var args CMDLineArgs
+func getCMDArguments() (CMDLineArgs, error) {
+	return parseCMDArguments(os.Args[1:], os.Stderr)
+}
 
-	flag.BoolVar(
-		&args.watch, "watch", false,
-		"start in watch mode that checks and acts when IP changes",
-	)
-	flag.BoolVar(
-		&args.watch, "w", false,
-		"start in watch mode that checks and acts when IP changes (shorthand)",
-	)
+func parseCMDArguments(argv []string, output io.Writer) (CMDLineArgs, error) {
+	args := CMDLineArgs{
+		command:    CommandRun,
+		configFile: config.DefaultConfigFile,
+	}
 
-	flag.DurationVar(
-		&args.interval, "time", time.Minute,
-		"IP check interval (e.g. 2m, 2h)",
-	)
-	flag.DurationVar(
-		&args.interval, "t", time.Minute,
-		"IP check interval (e.g. 2m, 2h) (shorthand)",
-	)
+	if len(argv) > 0 && argv[0] != "" && argv[0][0] != '-' {
+		args.command = argv[0]
+		argv = argv[1:]
+	}
 
-	flag.StringVar(
-		&args.configFile, "config", "config.yaml",
-		"path to config file (default: config.yaml)",
-	)
-	flag.StringVar(
-		&args.configFile, "c", "config.yaml",
-		"path to config file (shorthand)",
-	)
+	if args.command != CommandRun && args.command != CommandDaemon {
+		return args, fmt.Errorf("unknown command %q", args.command)
+	}
 
-	flag.Parse()
+	flags := flag.NewFlagSet(args.command, flag.ContinueOnError)
+	flags.SetOutput(output)
+	flags.StringVar(&args.configFile, "config", config.DefaultConfigFile, "path to TOML config file")
+	flags.StringVar(&args.configFile, "c", config.DefaultConfigFile, "path to TOML config file")
+	flags.DurationVar(&args.interval, "interval", 0, "daemon interval override")
+	flags.DurationVar(&args.interval, "i", 0, "daemon interval override")
 
-	return args
+	if err := flags.Parse(argv); err != nil {
+		return args, err
+	}
+	args.intervalSet = args.interval > 0
+	return args, nil
 }

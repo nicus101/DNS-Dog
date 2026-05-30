@@ -1,0 +1,29 @@
+[ovh]
+endpoint = "ovh-eu"
+zone = "example.com"
+subdomains = ["home", "vpn"]
+
+[observe]
+reverse_dns = true
+state_file = "/var/lib/dns-dog/state.toml"
+
+[[ip_provider]]
+name = "ipify"
+url = "https://api.ipify.org?format=json"
+json_key = "ip"
+
+[[ip_provider]]
+name = "ip-api"
+url = "http://ip-api.com/json/"
+json_key = "query"
+
+[daemon]
+interval = "10m"
+initial_backoff = "10s"
+max_backoff = "5m"
+
+[[action]]
+name = "restart-game-server"
+command = "systemctl"
+args = ["restart", "game-server.service"]
+timeout = "30s"
