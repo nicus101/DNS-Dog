@@ -7,7 +7,7 @@ import (
 	"net"
 
 	"github.com/nicus101/godyndns-ovh/internal/config"
-	"github.com/nicus101/godyndns-ovh/pkg/publicip"
+	"github.com/nicus101/godyndns-ovh/internal/publicip"
 )
 
 type IPObserver interface {
