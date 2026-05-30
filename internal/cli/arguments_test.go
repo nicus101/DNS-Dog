@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"io"
@@ -8,7 +8,7 @@ import (
 	"github.com/nicus101/godyndns-ovh/internal/config"
 )
 
-func TestParseCMDArguments(t *testing.T) {
+func TestParse(t *testing.T) {
 	tests := []struct {
 		name            string
 		args            []string
@@ -51,11 +51,21 @@ func TestParseCMDArguments(t *testing.T) {
 			args:    []string{"watch"},
 			wantErr: true,
 		},
+		{
+			name:    "run rejects interval override",
+			args:    []string{"run", "-interval=5m"},
+			wantErr: true,
+		},
+		{
+			name:    "invalid interval duration",
+			args:    []string{"daemon", "-interval=soon"},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := parseCMDArguments(tt.args, io.Discard)
+			got, err := Parse(tt.args, io.Discard)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("expected error")
@@ -65,17 +75,17 @@ func TestParseCMDArguments(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if got.command != tt.wantCommand {
-				t.Errorf("command = %q, want %q", got.command, tt.wantCommand)
+			if got.Command != tt.wantCommand {
+				t.Errorf("Command = %q, want %q", got.Command, tt.wantCommand)
 			}
-			if got.interval != tt.wantDuration {
-				t.Errorf("interval = %v, want %v", got.interval, tt.wantDuration)
+			if got.Interval != tt.wantDuration {
+				t.Errorf("Interval = %v, want %v", got.Interval, tt.wantDuration)
 			}
-			if got.intervalSet != tt.wantIntervalSet {
-				t.Errorf("intervalSet = %v, want %v", got.intervalSet, tt.wantIntervalSet)
+			if got.IntervalSet != tt.wantIntervalSet {
+				t.Errorf("IntervalSet = %v, want %v", got.IntervalSet, tt.wantIntervalSet)
 			}
-			if got.configFile != tt.wantConfig {
-				t.Errorf("configFile = %q, want %q", got.configFile, tt.wantConfig)
+			if got.ConfigFile != tt.wantConfig {
+				t.Errorf("ConfigFile = %q, want %q", got.ConfigFile, tt.wantConfig)
 			}
 		})
 	}

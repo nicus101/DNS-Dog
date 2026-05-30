@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/nicus101/godyndns-ovh/internal/cli"
 	"github.com/nicus101/godyndns-ovh/internal/config"
 	"github.com/nicus101/godyndns-ovh/internal/dns"
 	"github.com/nicus101/godyndns-ovh/internal/runner"
@@ -13,17 +14,17 @@ import (
 func main() {
 	logger := log.New(os.Stdout, "", log.LstdFlags)
 
-	arguments, err := getCMDArguments()
+	arguments, err := cli.FromOSArgs(os.Stderr)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	cfg, err := config.Load(arguments.configFile)
+	cfg, err := config.Load(arguments.ConfigFile)
 	if err != nil {
 		log.Fatal("load config: ", err)
 	}
-	if arguments.intervalSet {
-		cfg.Daemon.Interval = arguments.interval.String()
+	if arguments.IntervalSet {
+		cfg.Daemon.Interval = arguments.Interval.String()
 	}
 
 	dnsProvider, err := dns.NewOVHProvider(cfg)
@@ -37,16 +38,16 @@ func main() {
 		log.Fatal(err)
 	}
 
-	switch arguments.command {
-	case CommandRun:
+	switch arguments.Command {
+	case cli.CommandRun:
 		if _, err := appRunner.RunCycle(ctx, true); err != nil {
 			log.Fatal(err)
 		}
-	case CommandDaemon:
+	case cli.CommandDaemon:
 		if err := runner.RunDaemon(ctx, appRunner); err != nil {
 			log.Fatal(err)
 		}
 	default:
-		log.Fatalf("unknown command %q", arguments.command)
+		log.Fatalf("unknown command %q", arguments.Command)
 	}
 }
