@@ -35,7 +35,7 @@ archives:
       - goos: windows
         format: zip
     files:
-      - config.yaml.example
+      - dns-dog.toml.example
       - ovh.conf.example
 
 changelog:
