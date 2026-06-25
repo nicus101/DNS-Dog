@@ -2,96 +2,85 @@
 
 ## Purpose
 
-DNS-Dog keeps configured OVH DynHost records aligned with the host's current
-public network identity. It can run as a one-shot operator command or as a
-long-running daemon.
+DNS-Dog observes the host's public network state and optionally keeps one set of
+managed DNS records aligned with that state. It can also run local command hooks
+after successful observation or reconciliation events.
 
-The tool observes public IP and, when enabled, reverse DNS. Reverse DNS is an
-observed signal only; DNS-Dog does not mutate reverse DNS.
+DNS-Dog can run as a one-shot operator command or as a long-running daemon.
+
+## Core concepts
+
+DNS-Dog v1 uses three primary concepts:
+
+- **Observe**: collect the host's public IP address and, when enabled, reverse
+  DNS names for that address.
+- **Reconcile**: optionally update one configured DNS target so its managed
+  records match the observed public IP.
+- **Hooks**: optionally run local commands after successful cycle events.
+
+OVH DynHost is the supported v1 reconciliation backend. OVH record updates are
+reconciliation work, not hooks.
+
+Reverse DNS is an observed signal only. DNS-Dog may use reverse DNS changes to
+trigger hooks, but it never mutates reverse DNS.
+
+## Simplicity rule
+
+One DNS-Dog instance has:
+
+- one observation loop
+- zero or one reconciliation target
+- one ordered hook list
+
+Multiple reconciliation targets, different hook policies, or hooks that should
+fire on failure are modeled as multiple DNS-Dog instances or external wrappers.
+DNS-Dog v1 intentionally avoids a workflow engine.
 
 ## Runtime modes
 
-`dns-dog run` performs one observation and DNS reconciliation cycle, runs all
-configured actions after successful checks, then exits.
+`dns-dog run` performs one cycle, runs hooks when the cycle rules say hooks
+should run, then exits.
 
-`dns-dog daemon` validates configuration and OVH access at startup, then runs
-forever until stopped or until a hard failure is detected. Daemon mode runs
-configured actions only after a detected public IP/reverse DNS change or after
-DNS reconciliation updates at least one record.
+`dns-dog daemon` validates configuration and required provider access at startup,
+then repeats cycles until stopped or until a hard failure is detected. Transient
+failures are logged and retried with backoff.
 
-## Configuration
+## High-level cycle
 
-The v1 configuration format is TOML. YAML configuration is not accepted.
+Each cycle performs these phases in order:
 
-Credentials are not stored in the main TOML file. They may come from OVH config
-files, environment variables, or a local `.env` file.
+1. Observe public IP.
+2. Observe reverse DNS if enabled.
+3. Load previous observed state if state is configured or available in memory.
+4. Reconcile DNS records if a reconciler is configured.
+5. Run hooks if the completed cycle produced a hook trigger.
+6. Store the successfully completed observed state.
 
-Minimum configuration shape:
+If no reconciler is configured, DNS-Dog can still observe public IP/reverse DNS
+and run hooks. This supports use cases such as updating local mail, routing, or
+homelab service configuration without touching DNS records.
 
-```toml
-[ovh]
-endpoint = "ovh-eu"
-zone = "example.com"
-subdomains = ["home", "vpn"]
-
-[observe]
-reverse_dns = true
-state_file = "/var/lib/dns-dog/state.toml"
-
-[[ip_provider]]
-name = "ipify"
-url = "https://api.ipify.org?format=json"
-json_key = "ip"
-
-[[ip_provider]]
-name = "ip-api"
-url = "http://ip-api.com/json/"
-json_key = "query"
-
-[daemon]
-interval = "10m"
-initial_backoff = "10s"
-max_backoff = "5m"
-
-[[action]]
-name = "restart-game-server"
-command = "systemctl"
-args = ["restart", "game-server.service"]
-timeout = "30s"
-```
-
-## Reconciliation
-
-For each configured subdomain, DNS-Dog reads the current OVH DynHost record. If
-the record already matches the observed public IP, the record is skipped. If the
-record is stale, DNS-Dog updates it.
-
-DNS-Dog refreshes the OVH zone only after at least one record update succeeds.
-Daemon actions run only after a successful change-driven reconciliation.
+Hooks run only after the required phases for the instance succeed. Hooks do not
+run after reconciliation failure.
 
 ## Failure policy
 
-Hard failures cause DNS-Dog to exit non-zero:
+Hard failures cause DNS-Dog to exit non-zero. They include invalid
+configuration, invalid hook definitions, missing credentials for a configured
+reconciler, and insufficient startup access to required provider APIs.
 
-- invalid TOML
-- missing required config
-- missing or invalid credentials
-- insufficient OVH permissions
-- invalid action configuration
+Transient failures are retried in daemon mode. They include public IP provider
+outages, reverse DNS lookup failures, provider timeouts/rate limits/server
+errors during normal operation, reconciliation refresh failures, and hook command
+failures.
 
-Transient failures are logged and retried in daemon mode:
+One-shot mode exits non-zero when any required operation for the cycle fails.
 
-- public IP provider timeout, invalid response, or temporary outage
-- reverse DNS lookup failure
-- OVH timeout, rate limit, or server error during normal operation
-- zone refresh failure
-- action command failure
+## Detailed contracts
 
-One-shot mode exits non-zero when a required operation fails.
-
-## State
-
-If `observe.state_file` is set, daemon mode stores the last successfully
-observed public IP and reverse DNS values. This prevents restarts from creating
-false change events. If no state file is configured, state is kept in memory for
-the lifetime of the process.
+- [Configuration v1](config-v1.md) defines the TOML schema, defaults,
+  validation, and credential loading.
+- [Cycle v1](cycle-v1.md) defines exact observe/reconcile/hook ordering,
+  first-run behavior, state timing, and hook triggers.
+- [Failures v1](failures-v1.md) defines hard and transient failure
+  classification.
